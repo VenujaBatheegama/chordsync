@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: chordsync-server
+    env: node
+    rootDir: server
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
