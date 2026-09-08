@@ -1,64 +1,81 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 import type { SessionState } from '../lib/types';
 import { getUserId, getUsername } from '../lib/user';
+import { api } from '../lib/api';
 
-interface UseSocketReturn {
-  sessionState: SessionState | null;
-  isConnected: boolean;
-  pushStateUpdate: (patch: Partial<Pick<SessionState, 'currentItemId' | 'scrollPercent' | 'transposeOffset'>>) => void;
-  claimLeader: () => void;
-  leaderUserName: string | null;
-  leaderUserId: string | null;
-}
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
-export function useSocket(shareCode: string, playlistId: string): UseSocketReturn {
-  const socketRef = useRef<Socket | null>(null);
+export function useSocket(shareCode: string, playlistId: string) {
+  const channelRef = useRef<RealtimeChannel | null>(null);
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const userId = getUserId();
   const userName = getUsername() || 'Anonymous';
 
   useEffect(() => {
-    const socket = io('/', { path: '/socket.io', transports: ['websocket', 'polling'] });
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
-      setIsConnected(true);
-      socket.emit('join_session', { shareCode, playlistId, userId, userName });
-    });
-
-    socket.on('disconnect', () => setIsConnected(false));
-
-    socket.on('session_state', (state: SessionState) => {
+    // 1. Fetch initial state
+    api.getSession(shareCode).then(({ state }) => {
       setSessionState(state);
     });
 
-    socket.on('state_update', (state: SessionState) => {
-      setSessionState(state);
-    });
+    // 2. Setup Realtime Channel
+    const channel = supabase.channel(`session:${shareCode}`);
+    channelRef.current = channel;
 
-    socket.on('leader_change', (data: { leaderUserId: string | null; leaderUserName: string | null }) => {
-      setSessionState((prev) =>
-        prev ? { ...prev, leaderUserId: data.leaderUserId, leaderUserName: data.leaderUserName } : prev
-      );
-    });
+    channel
+      .on('broadcast', { event: 'state_update' }, ({ payload }) => {
+        setSessionState((prev) => prev ? { ...prev, ...payload.patch } : prev);
+      })
+      .on('broadcast', { event: 'leader_change' }, ({ payload }) => {
+        setSessionState((prev) =>
+          prev ? { ...prev, leaderUserId: payload.leaderUserId, leaderUserName: payload.leaderUserName } : prev
+        );
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'Session', filter: `shareCode=eq.${shareCode}` }, (payload) => {
+        setSessionState(payload.new as SessionState);
+      })
+      .subscribe((status) => {
+        setIsConnected(status === 'SUBSCRIBED');
+      });
 
     return () => {
-      socket.emit('leave_session', { shareCode, userId });
-      socket.disconnect();
+      supabase.removeChannel(channel);
     };
   }, [shareCode, playlistId]);
 
   const pushStateUpdate = useCallback(
     (patch: Partial<Pick<SessionState, 'currentItemId' | 'scrollPercent' | 'transposeOffset'>>) => {
-      socketRef.current?.emit('state_update', { shareCode, patch });
+      // Optimistic update
+      setSessionState((prev) => prev ? { ...prev, ...patch } : prev);
+      
+      // Broadcast instantly to peers
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'state_update',
+        payload: { patch },
+      });
+
+      // Persist to DB (fire and forget)
+      supabase.from('Session').update(patch).eq('shareCode', shareCode).then();
     },
     [shareCode]
   );
 
   const claimLeader = useCallback(() => {
-    socketRef.current?.emit('claim_leader', { shareCode, userId, userName });
+    const patch = { leaderUserId: userId, leaderUserName: userName };
+    setSessionState((prev) => prev ? { ...prev, ...patch } : prev);
+    
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'leader_change',
+      payload: patch,
+    });
+
+    supabase.from('Session').update(patch).eq('shareCode', shareCode).then();
   }, [shareCode, userId, userName]);
 
   return {
