@@ -37,6 +37,13 @@ export default function App() {
     e.preventDefault();
     const name = newPlaylistName.trim();
     if (!name || !username) return;
+
+    const exists = playlists.some((p) => p.name.toLowerCase() === name.toLowerCase());
+    if (exists) {
+      alert('A playlist with this name already exists!');
+      return;
+    }
+
     setCreatingPlaylist(true);
     try {
       await api.createPlaylist(name, username);
