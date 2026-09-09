@@ -1,5 +1,5 @@
-import { supabase } from '../db/client';
-import type { NormalizedSong } from '../types';
+import { supabase } from '../db/client.js';
+import type { NormalizedSong } from '../types.js';
 
 const CACHE_TTL_MS = 48 * 60 * 60 * 1000; // 48 hours
 

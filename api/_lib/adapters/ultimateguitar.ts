@@ -1,4 +1,3 @@
-import axios from 'axios';
 import * as cheerio from 'cheerio';
 import type {
   SourceAdapter,
@@ -7,20 +6,15 @@ import type {
   SongSection,
   LyricLine,
   ChordPosition,
-} from '../types';
-import { globalRateLimiter } from './rateLimiter';
+} from '../types.js';
+import { globalRateLimiter } from './rateLimiter.js';
 
-const httpClient = axios.create({
-  timeout: 10_000,
-  headers: {
-    'User-Agent':
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.5',
-    Referer: 'https://www.ultimate-guitar.com/',
-    Cookie: 'ul_remember=1',
-  },
-});
+const HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.5',
+};
 
 // UG tab data types (subset we care about)
 interface UGTabData {
@@ -56,8 +50,9 @@ export class UltimateGuitarAdapter implements SourceAdapter {
     try {
       await globalRateLimiter.throttle('ultimate_guitar');
       const searchUrl = `https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(query)}`;
-      const response = await httpClient.get(searchUrl);
-      const $ = cheerio.load(response.data as string);
+      const response = await fetch(searchUrl, { headers: HEADERS });
+      const text = await response.text();
+      const $ = cheerio.load(text);
 
       const storeDiv = $('div.js-store');
       if (!storeDiv.length) return [];
@@ -85,8 +80,9 @@ export class UltimateGuitarAdapter implements SourceAdapter {
 
   async getChords(url: string): Promise<NormalizedSong> {
     await globalRateLimiter.throttle('ultimate_guitar');
-    const response = await httpClient.get(url);
-    const $ = cheerio.load(response.data as string);
+    const response = await fetch(url, { headers: HEADERS });
+    const text = await response.text();
+    const $ = cheerio.load(text);
 
     const storeDiv = $('div.js-store');
     if (!storeDiv.length) {

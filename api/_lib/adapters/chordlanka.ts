@@ -1,4 +1,3 @@
-import axios from 'axios';
 import * as cheerio from 'cheerio';
 import type {
   SourceAdapter,
@@ -7,29 +6,27 @@ import type {
   SongSection,
   LyricLine,
   ChordPosition,
-} from '../types';
-import { globalRateLimiter } from './rateLimiter';
+} from '../types.js';
+import { globalRateLimiter } from './rateLimiter.js';
 
 const BASE_URL = 'https://www.chordlanka.com';
 
-const httpClient = axios.create({
-  timeout: 10_000,
-  headers: {
-    'User-Agent':
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.5',
-  },
-});
+const HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.5',
+};
 
 export class ChordLankaAdapter implements SourceAdapter {
   async search(query: string): Promise<SearchResult[]> {
     try {
       await globalRateLimiter.throttle('chordlanka');
-      const response = await httpClient.get(`${BASE_URL}/`, {
-        params: { s: query },
-      });
-      const $ = cheerio.load(response.data as string);
+      const url = new URL(`${BASE_URL}/`);
+      url.searchParams.set('s', query);
+      const response = await fetch(url.toString(), { headers: HEADERS });
+      const text = await response.text();
+      const $ = cheerio.load(text);
       const results: SearchResult[] = [];
 
       // ChordLanka search results: list of song links with artist/title info
@@ -72,8 +69,9 @@ export class ChordLankaAdapter implements SourceAdapter {
 
   async getChords(url: string): Promise<NormalizedSong> {
     await globalRateLimiter.throttle('chordlanka');
-    const response = await httpClient.get(url);
-    const $ = cheerio.load(response.data as string);
+    const response = await fetch(url, { headers: HEADERS });
+    const text = await response.text();
+    const $ = cheerio.load(text);
 
     // ----- Title and Artist -----
     // ChordLanka uses <h1 id="song_title"> and the <h2> below it for artist

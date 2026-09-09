@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ChordLankaAdapter } from './_lib/adapters/chordlanka';
-import { UltimateGuitarAdapter } from './_lib/adapters/ultimateguitar';
-import { SongCacheService } from './_lib/services/songCache';
+import { ChordLankaAdapter } from './_lib/adapters/chordlanka.js';
+import { UltimateGuitarAdapter } from './_lib/adapters/ultimateguitar.js';
+import { SongCacheService } from './_lib/services/songCache.js';
 
 const chordlanka = new ChordLankaAdapter();
 const ultimateGuitar = new UltimateGuitarAdapter();
