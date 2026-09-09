@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import type { SessionState } from '../types.js';
+import type { SessionState } from '../types';
 
 // In-memory session store: shareCode → SessionState
 const sessions = new Map<string, SessionState>();

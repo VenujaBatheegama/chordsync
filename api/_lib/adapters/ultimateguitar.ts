@@ -7,8 +7,8 @@ import type {
   SongSection,
   LyricLine,
   ChordPosition,
-} from '../types.js';
-import { globalRateLimiter } from './rateLimiter.js';
+} from '../types';
+import { globalRateLimiter } from './rateLimiter';
 
 const httpClient = axios.create({
   timeout: 10_000,

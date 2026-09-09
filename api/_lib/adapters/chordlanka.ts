@@ -7,8 +7,8 @@ import type {
   SongSection,
   LyricLine,
   ChordPosition,
-} from '../types.js';
-import { globalRateLimiter } from './rateLimiter.js';
+} from '../types';
+import { globalRateLimiter } from './rateLimiter';
 
 const BASE_URL = 'https://www.chordlanka.com';
 
