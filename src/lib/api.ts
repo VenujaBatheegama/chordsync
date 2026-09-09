@@ -28,6 +28,31 @@ export const api = {
   getSong: (source: string, url: string) =>
     request<{ song: NormalizedSong }>(`/song?source=${encodeURIComponent(source)}&url=${encodeURIComponent(url)}`),
 
+  fetchSongCover: async (title: string, artist: string): Promise<string | null> => {
+    try {
+      const cacheKey = `cover_${title}_${artist}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) return cached;
+
+      // Use iTunes Search API
+      const query = encodeURIComponent(`${title} ${artist}`.trim());
+      const res = await fetch(`https://itunes.apple.com/search?term=${query}&entity=song&limit=1`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      
+      if (data.results && data.results.length > 0) {
+        // Upgrade to 300x300 image
+        const imgUrl = data.results[0].artworkUrl100.replace('100x100bb', '300x300bb');
+        localStorage.setItem(cacheKey, imgUrl);
+        return imgUrl;
+      }
+      return null;
+    } catch (err) {
+      console.error('Failed to fetch cover:', err);
+      return null;
+    }
+  },
+
   // --- Direct Supabase Database Calls ---
   getPlaylists: async (userName: string) => {
     // We get the user first
